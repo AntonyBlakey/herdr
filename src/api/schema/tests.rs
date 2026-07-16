@@ -123,6 +123,81 @@ fn agent_start_and_prompt_requests_round_trip() {
 }
 
 #[test]
+fn ui_layout_request_and_response_round_trip() {
+    let request = Request {
+        id: "req_1".into(),
+        method: Method::UiLayout(EmptyParams {}),
+    };
+    let json = serde_json::to_value(&request).unwrap();
+    assert_eq!(json["method"], "ui.layout");
+    let restored: Request = serde_json::from_value(json).unwrap();
+    assert_eq!(restored, request);
+
+    let response = SuccessResponse {
+        id: "req_1".into(),
+        result: ResponseResult::UiLayout {
+            layout: UiLayoutPath::Desktop,
+            obscured: false,
+            canvas: UiLayoutCanvas {
+                width: 100,
+                height: 30,
+            },
+            sidebar: UiLayoutSidebar {
+                mode: SidebarMode::Expanded,
+                rect: PaneLayoutRect {
+                    x: 0,
+                    y: 0,
+                    width: 26,
+                    height: 30,
+                },
+                workspaces: vec![UiLayoutWorkspaceEntry {
+                    workspace_id: "w_1".into(),
+                    focused: true,
+                    rect: PaneLayoutRect {
+                        x: 0,
+                        y: 0,
+                        width: 25,
+                        height: 2,
+                    },
+                }],
+                agents: vec![UiLayoutAgentEntry {
+                    pane_id: "w_1:p1".into(),
+                    rect: PaneLayoutRect {
+                        x: 0,
+                        y: 10,
+                        width: 25,
+                        height: 1,
+                    },
+                }],
+            },
+            tab_bar: UiLayoutTabBar {
+                rect: PaneLayoutRect {
+                    x: 26,
+                    y: 0,
+                    width: 74,
+                    height: 1,
+                },
+                workspace_id: "w_1".into(),
+                tabs: vec![UiLayoutTabEntry {
+                    tab_id: "w_1:t1".into(),
+                    focused: true,
+                    rect: PaneLayoutRect {
+                        x: 26,
+                        y: 0,
+                        width: 14,
+                        height: 1,
+                    },
+                }],
+            },
+        },
+    };
+    let json = serde_json::to_value(&response).unwrap();
+    assert_eq!(json["result"]["type"], "ui_layout");
+    let restored: SuccessResponse = serde_json::from_value(json).unwrap();
+    assert_eq!(restored, response);
+}
+
+#[test]
 fn bundled_protocol_schema_refs_resolve_inside_bundle() {
     fn assert_no_standalone_refs(value: &serde_json::Value) {
         match value {

@@ -10,6 +10,7 @@ pub mod response;
 pub mod server;
 pub mod session;
 pub mod tabs;
+pub mod ui;
 pub mod workspaces;
 pub mod worktrees;
 
@@ -23,6 +24,7 @@ pub use response::*;
 pub use server::*;
 pub use session::*;
 pub use tabs::*;
+pub use ui::*;
 pub use workspaces::*;
 pub use worktrees::*;
 
@@ -135,6 +137,8 @@ pub enum Method {
     PaneZoom(PaneZoomParams),
     #[serde(rename = "pane.layout")]
     PaneLayout(PaneLayoutParams),
+    #[serde(rename = "ui.layout")]
+    UiLayout(EmptyParams),
     #[serde(rename = "pane.process_info")]
     PaneProcessInfo(PaneProcessInfoParams),
     #[serde(rename = "layout.export")]
