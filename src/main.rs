@@ -554,6 +554,7 @@ fn main() -> io::Result<()> {
         println!("       herdr notification <subcommand> ...");
         println!("       herdr agent <subcommand> ...");
         println!("       herdr pane <subcommand> ...");
+        println!("       herdr ui <subcommand> ...");
         println!("       herdr session <subcommand> ...");
         println!("       herdr integration <subcommand> ...");
         println!();
@@ -610,6 +611,10 @@ fn main() -> io::Result<()> {
             (
                 "herdr pane <subcommand>",
                 "Pane control helpers over the socket API",
+            ),
+            (
+                "herdr ui <subcommand>",
+                "UI layout geometry helpers over the socket API",
             ),
             (
                 "herdr session <subcommand>",

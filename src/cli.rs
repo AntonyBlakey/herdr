@@ -21,6 +21,7 @@ mod server;
 mod spec;
 mod status;
 mod tab;
+mod ui;
 mod workspace;
 mod worktree;
 
@@ -96,6 +97,7 @@ pub fn maybe_run(args: &[String]) -> std::io::Result<CommandOutcome> {
         "agent" => agent::run_agent_command(&args[2..])?,
         "terminal" => run_terminal_command(&args[2..])?,
         "pane" => pane::run_pane_command(&args[2..])?,
+        "ui" => ui::run_ui_command(&args[2..])?,
         "plugin" => plugin::run_plugin_command(&args[2..])?,
         "integration" => integration::run_integration_command(&args[2..])?,
         "session" => run_session_command(&args[2..])?,
