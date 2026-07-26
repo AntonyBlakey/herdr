@@ -630,7 +630,10 @@ impl TerminalState {
         if self.known_agent_label_conflicts_with_detected_agent(&agent_label) {
             return None;
         }
-        let owner_conflicts = self.current_session_owner_conflicts(&source, &agent_label);
+        // A report carrying no session ref makes no session-identity claim, so it
+        // cannot conflict with whoever owns that identity.
+        let owner_conflicts =
+            session_ref.is_some() && self.current_session_owner_conflicts(&source, &agent_label);
         let foreground_takeover_allowed = owner_conflicts
             && self.foreground_agent_confirms_hook_authority_takeover(
                 &source,
@@ -688,7 +691,11 @@ impl TerminalState {
                 }
             }
         }
-        self.persisted_agent_session = None;
+        // Likewise, a report that claims no session identity must not clear the
+        // identity the owner persisted for resume.
+        if session_ref.is_some() {
+            self.persisted_agent_session = None;
+        }
         self.hook_authority = Some(HookAuthority {
             source,
             agent_label,
@@ -4813,6 +4820,71 @@ mod tests {
                 session.session_ref.value.as_str()
             )),
             Some(("herdr:droid", "droid", "droid-session"))
+        );
+    }
+
+    #[test]
+    fn session_ref_less_hook_report_is_accepted_despite_different_session_owner() {
+        let mut terminal = test_terminal();
+        terminal.set_persisted_agent_session(crate::agent_resume::PersistedAgentSession {
+            source: "herdr:claude".into(),
+            agent: "claude".into(),
+            session_ref: crate::agent_resume::AgentSessionRef::id("claude-session").unwrap(),
+        });
+        terminal.set_detected_state(Some(Agent::Claude), AgentState::Idle);
+
+        let mutation = terminal.set_hook_authority_with_session_ref(
+            "grove".into(),
+            "grove".into(),
+            AgentState::Blocked,
+            None,
+            None,
+            Some(21),
+        );
+
+        assert!(
+            mutation.is_some(),
+            "a report claiming no session identity should not conflict with the session owner"
+        );
+        assert_eq!(terminal.state, AgentState::Blocked);
+        assert_eq!(
+            terminal
+                .hook_authority
+                .as_ref()
+                .map(|authority| (authority.source.as_str(), authority.agent_label.as_str())),
+            Some(("grove", "grove"))
+        );
+    }
+
+    #[test]
+    fn session_ref_less_hook_report_preserves_the_session_owner() {
+        let mut terminal = test_terminal();
+        terminal.set_persisted_agent_session(crate::agent_resume::PersistedAgentSession {
+            source: "herdr:claude".into(),
+            agent: "claude".into(),
+            session_ref: crate::agent_resume::AgentSessionRef::id("claude-session").unwrap(),
+        });
+        terminal.set_detected_state(Some(Agent::Claude), AgentState::Idle);
+
+        terminal
+            .set_hook_authority_with_session_ref(
+                "grove".into(),
+                "grove".into(),
+                AgentState::Working,
+                None,
+                None,
+                Some(21),
+            )
+            .expect("session-ref-less report should be accepted");
+
+        assert_eq!(
+            terminal.persisted_agent_session.as_ref().map(|session| (
+                session.source.as_str(),
+                session.agent.as_str(),
+                session.session_ref.value.as_str()
+            )),
+            Some(("herdr:claude", "claude", "claude-session")),
+            "a report claiming no session identity must not clear the session owner"
         );
     }
 
