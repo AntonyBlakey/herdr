@@ -18,6 +18,7 @@ use super::plugins::{
 use super::server::ServerCapabilities;
 use super::session::SessionSnapshot;
 use super::tabs::TabInfo;
+use super::ui::{UiLayoutCanvas, UiLayoutPath, UiLayoutSidebar, UiLayoutTabBar};
 use super::workspaces::WorkspaceInfo;
 use super::worktrees::{WorktreeInfo, WorktreeSourceInfo};
 
@@ -134,6 +135,13 @@ pub enum ResponseResult {
     },
     PaneLayout {
         layout: PaneLayoutSnapshot,
+    },
+    UiLayout {
+        layout: UiLayoutPath,
+        obscured: bool,
+        canvas: UiLayoutCanvas,
+        sidebar: UiLayoutSidebar,
+        tab_bar: UiLayoutTabBar,
     },
     PaneProcessInfo {
         process_info: PaneProcessInfo,

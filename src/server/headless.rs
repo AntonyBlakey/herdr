@@ -2322,6 +2322,22 @@ impl HeadlessServer {
                     true
                 }
             }
+            ServerEvent::ClientShellUiLayout { client_id, report } => {
+                // Several shells can be attached with different chrome; the one
+                // in the foreground is the one `ui.layout` describes.
+                let Some(client) = self.clients.get(&client_id) else {
+                    return false;
+                };
+                if !client.is_active_shell_client()
+                    || self
+                        .foreground_client_id
+                        .is_some_and(|foreground| foreground != client_id)
+                {
+                    return false;
+                }
+                self.app.state.ui_layout = Some(*report);
+                false
+            }
             ServerEvent::ClientShellMouseCapture { client_id, enabled } => {
                 let Some(client) = self.clients.get_mut(&client_id) else {
                     return false;

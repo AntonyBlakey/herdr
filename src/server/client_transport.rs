@@ -522,6 +522,11 @@ pub(crate) enum ServerEvent {
     ClientShellMouseCapture { client_id: u64, enabled: bool },
     /// The committed shell asks the server to replay presentation effects before input resumes.
     ClientShellPresentationSync { client_id: u64, token: String },
+    /// A client-owned shell published its current chrome geometry for `ui.layout`.
+    ClientShellUiLayout {
+        client_id: u64,
+        report: Box<crate::protocol::endpoint::UiLayoutReport>,
+    },
     /// A client-owned shell invoked one endpoint operation through this connection.
     ClientShellEndpointRequest {
         client_id: u64,
@@ -1344,6 +1349,20 @@ fn client_read_loop_with_endpoint_controls(
                 ServerEvent::ClientShellPresentationSync {
                     client_id,
                     token: data,
+                }
+            }
+            ClientMessage::EndpointControl { kind, data }
+                if kind == crate::protocol::endpoint::UI_LAYOUT_REPORT_KIND =>
+            {
+                match serde_json::from_str(&data) {
+                    Ok(report) => ServerEvent::ClientShellUiLayout {
+                        client_id,
+                        report: Box::new(report),
+                    },
+                    Err(error) => {
+                        debug!(client_id, %error, "ignoring malformed ui layout report");
+                        continue;
+                    }
                 }
             }
             ClientMessage::EndpointControl { kind, data } => {

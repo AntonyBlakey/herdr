@@ -819,6 +819,13 @@ pub struct AppState {
     /// Last reported focus state for the outer terminal hosting herdr.
     /// None means unsupported or not yet reported, which preserves active-pane suppression.
     pub outer_terminal_focus: Option<bool>,
+    /// Chrome geometry last published by the foreground client-owned shell.
+    ///
+    /// Sidebar and tab-bar geometry is client state, so this is the only source
+    /// the `ui.layout` API method can answer from. `None` means no shell has
+    /// reported yet — a headless server, or one whose client has not composed a
+    /// frame.
+    pub ui_layout: Option<crate::protocol::endpoint::UiLayoutReport>,
     // Config
     pub prefix_keys: Vec<(KeyCode, KeyModifiers)>,
     /// Virtual terminal size (columns, rows) used when no client is attached.
@@ -1061,6 +1068,7 @@ impl AppState {
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
             outer_terminal_focus: None,
+            ui_layout: None,
             prefix_keys: vec![(KeyCode::Char('b'), KeyModifiers::CONTROL)],
             headless_size: (
                 crate::config::DEFAULT_HEADLESS_COLS,

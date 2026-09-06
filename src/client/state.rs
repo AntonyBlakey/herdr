@@ -80,6 +80,9 @@ pub(super) struct ClientState {
     pub(super) draw_host_cursor: bool,
     pub(super) detached_process_children: Vec<std::process::Child>,
     pub(super) shell: Option<shell::ClientShellState>,
+    /// Last chrome geometry published to the active endpoint, so an unchanged
+    /// layout costs no message. `None` means nothing has been published yet.
+    pub(super) published_ui_layout: Option<crate::protocol::endpoint::UiLayoutReport>,
 }
 
 impl Drop for ClientState {
@@ -143,6 +146,7 @@ impl ClientState {
             shell: Some(shell::ClientShellState::new(
                 shell::ClientShellConfig::from_config(&crate::config::Config::default()),
             )),
+            published_ui_layout: None,
         }
     }
 

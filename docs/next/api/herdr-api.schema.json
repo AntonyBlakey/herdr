@@ -5516,6 +5516,22 @@
         {
           "properties": {
             "method": {
+              "const": "ui.layout",
+              "type": "string"
+            },
+            "params": {
+              "$ref": "#/schemas/request/$defs/EmptyParams"
+            }
+          },
+          "required": [
+            "method",
+            "params"
+          ],
+          "type": "object"
+        },
+        {
+          "properties": {
+            "method": {
               "const": "pane.process_info",
               "type": "string"
             },
@@ -9656,6 +9672,38 @@
             },
             {
               "properties": {
+                "canvas": {
+                  "$ref": "#/schemas/success_response/$defs/UiLayoutCanvas"
+                },
+                "layout": {
+                  "$ref": "#/schemas/success_response/$defs/UiLayoutPath"
+                },
+                "obscured": {
+                  "type": "boolean"
+                },
+                "sidebar": {
+                  "$ref": "#/schemas/success_response/$defs/UiLayoutSidebar"
+                },
+                "tab_bar": {
+                  "$ref": "#/schemas/success_response/$defs/UiLayoutTabBar"
+                },
+                "type": {
+                  "const": "ui_layout",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "type",
+                "layout",
+                "obscured",
+                "canvas",
+                "sidebar",
+                "tab_bar"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
                 "process_info": {
                   "$ref": "#/schemas/success_response/$defs/PaneProcessInfo"
                 },
@@ -10527,6 +10575,14 @@
           ],
           "type": "object"
         },
+        "SidebarMode": {
+          "enum": [
+            "expanded",
+            "compact",
+            "hidden"
+          ],
+          "type": "string"
+        },
         "SplitDirection": {
           "enum": [
             "right",
@@ -10570,6 +10626,138 @@
             "focused",
             "pane_count",
             "agent_status"
+          ],
+          "type": "object"
+        },
+        "UiLayoutAgentEntry": {
+          "properties": {
+            "pane_id": {
+              "type": "string"
+            },
+            "rect": {
+              "$ref": "#/schemas/success_response/$defs/PaneLayoutRect"
+            }
+          },
+          "required": [
+            "pane_id",
+            "rect"
+          ],
+          "type": "object"
+        },
+        "UiLayoutCanvas": {
+          "properties": {
+            "height": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            },
+            "width": {
+              "format": "uint16",
+              "maximum": 65535,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          "required": [
+            "width",
+            "height"
+          ],
+          "type": "object"
+        },
+        "UiLayoutPath": {
+          "enum": [
+            "desktop",
+            "mobile"
+          ],
+          "type": "string"
+        },
+        "UiLayoutSidebar": {
+          "properties": {
+            "agents": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/UiLayoutAgentEntry"
+              },
+              "type": "array"
+            },
+            "mode": {
+              "$ref": "#/schemas/success_response/$defs/SidebarMode"
+            },
+            "rect": {
+              "$ref": "#/schemas/success_response/$defs/PaneLayoutRect"
+            },
+            "workspaces": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/UiLayoutWorkspaceEntry"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "mode",
+            "rect",
+            "workspaces",
+            "agents"
+          ],
+          "type": "object"
+        },
+        "UiLayoutTabBar": {
+          "properties": {
+            "rect": {
+              "$ref": "#/schemas/success_response/$defs/PaneLayoutRect"
+            },
+            "tabs": {
+              "items": {
+                "$ref": "#/schemas/success_response/$defs/UiLayoutTabEntry"
+              },
+              "type": "array"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "rect",
+            "workspace_id",
+            "tabs"
+          ],
+          "type": "object"
+        },
+        "UiLayoutTabEntry": {
+          "properties": {
+            "focused": {
+              "type": "boolean"
+            },
+            "rect": {
+              "$ref": "#/schemas/success_response/$defs/PaneLayoutRect"
+            },
+            "tab_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "tab_id",
+            "focused",
+            "rect"
+          ],
+          "type": "object"
+        },
+        "UiLayoutWorkspaceEntry": {
+          "properties": {
+            "focused": {
+              "type": "boolean"
+            },
+            "rect": {
+              "$ref": "#/schemas/success_response/$defs/PaneLayoutRect"
+            },
+            "workspace_id": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "workspace_id",
+            "focused",
+            "rect"
           ],
           "type": "object"
         },

@@ -43,6 +43,7 @@ pub(super) fn command() -> Command {
         .subcommand(notification_command())
         .subcommand(agent_command())
         .subcommand(pane_command())
+        .subcommand(ui_command())
         .subcommand(terminal_command())
         .subcommand(session_command())
         .subcommand(integration_command())
@@ -214,6 +215,12 @@ fn notification_command() -> Command {
 
 fn agent_command() -> Command {
     super::agent::command()
+}
+
+fn ui_command() -> Command {
+    Command::new("ui")
+        .about("UI layout geometry helpers")
+        .subcommand(Command::new("layout").about("Show sidebar and tab bar layout geometry"))
 }
 
 fn pane_command() -> Command {

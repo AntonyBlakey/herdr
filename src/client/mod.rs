@@ -492,6 +492,7 @@ async fn run_client_loop(
         draw_host_cursor,
         detached_process_children: Vec::new(),
         shell: config.shell_config.map(shell::ClientShellState::new),
+        published_ui_layout: None,
     };
     let mut federated = endpoint_catalog.has_enabled_ssh();
     if let Some(shell) = state.shell.as_mut() {
@@ -781,6 +782,7 @@ async fn run_client_loop(
                 supervisors.retry_now(&endpoint_id, now);
             }
         }
+        publish_client_shell_ui_layout(&mut state, &mut write_stream);
         if let Some(shell) = state.shell.as_ref() {
             supervisors.spawn_due(
                 now,

@@ -530,6 +530,7 @@ impl App {
             toast: None,
             pending_agent_notifications: std::collections::HashMap::new(),
             outer_terminal_focus: None,
+            ui_layout: None,
             prefix_keys,
             headless_size: config.headless_size(),
             agent_panel_sort,
