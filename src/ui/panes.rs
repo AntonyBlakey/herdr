@@ -6,6 +6,7 @@ use ratatui::{
     Frame,
 };
 
+use super::haze::{self, color_to_rgb, haze_style, mix_rgb, HazeContext, Rgb};
 use super::scrollbar::{render_pane_scrollbar, should_show_scrollbar};
 #[cfg(test)]
 use super::text::display_width;
@@ -481,6 +482,40 @@ fn compute_pane_infos(
     )
 }
 
+/// Haze parameters for this frame, or `None` when hazing is disabled.
+fn haze_context(app: &AppState) -> Option<HazeContext> {
+    let ratio = app.inactive_pane_haze;
+    // NaN is checked explicitly so a value that somehow bypassed
+    // `UiConfig::inactive_pane_haze` disables hazing rather than enabling it.
+    if ratio.is_nan() || ratio <= 0.0 {
+        return None;
+    }
+
+    let default_bg = app
+        .host_terminal_theme
+        .background
+        .map(|c| (c.r, c.g, c.b))
+        .or_else(|| color_to_rgb(app.palette.panel_bg))
+        .unwrap_or((0, 0, 0));
+    let default_fg = app
+        .host_terminal_theme
+        .foreground
+        .map(|c| (c.r, c.g, c.b))
+        .or_else(|| color_to_rgb(app.palette.text))
+        .unwrap_or((255, 255, 255));
+    let haze = app
+        .inactive_pane_haze_color
+        .map(|color| haze::resolve(color, &app.host_terminal_theme, default_bg))
+        .unwrap_or(default_bg);
+
+    Some(HazeContext {
+        haze,
+        ratio,
+        default_fg,
+        default_bg,
+    })
+}
+
 pub(super) fn render_panes(
     app: &AppState,
     terminal_runtimes: &TerminalRuntimeRegistry,
@@ -497,6 +532,11 @@ pub(super) fn render_panes(
         return;
     };
 
+    // Resolved once per frame, not once per pane: this is a pane-scaled render
+    // loop, and the context depends only on config and the host theme.
+    let multi_pane = pane_infos.len() > 1;
+    let haze = multi_pane.then(|| haze_context(app)).flatten();
+
     for info in pane_infos {
         if let Some(rt) = app.runtime_for_pane_in_workspace(terminal_runtimes, ws_idx, info.id) {
             let show_cursor = info.is_focused
@@ -504,6 +544,18 @@ pub(super) fn render_panes(
                 && app.pane_exposes_host_cursor(ws_idx, info.id);
             rt.render(frame, info.inner_rect, show_cursor);
             render_pane_scrollbar(app, frame, info, rt);
+
+            if let Some(ctx) = haze.filter(|_| !info.is_focused) {
+                let inner = info.inner_rect;
+                let theme = app.host_terminal_theme;
+                let buf = frame.buffer_mut();
+                for y in inner.y..inner.y + inner.height {
+                    for x in inner.x..inner.x + inner.width {
+                        let cell = &mut buf[(x, y)];
+                        cell.set_style(haze_style(cell.style(), &theme, ctx));
+                    }
+                }
+            }
         } else if let Some(reason) = ws
             .tabs
             .get(target.tab_index)
@@ -596,12 +648,7 @@ fn render_pane_borders(
         }
         let cell = &mut buf[(x, y)];
         cell.set_symbol(symbol);
-        let color = if focused {
-            app.palette.accent
-        } else {
-            app.palette.overlay0
-        };
-        cell.set_style(Style::default().fg(color));
+        cell.set_style(app.pane_border_style(focused));
     }
 
     render_pane_border_titles(app, ws, pane_infos, frame);
@@ -763,12 +810,7 @@ fn render_pane_border_titles(
         if start_x >= end_x {
             continue;
         }
-        let color = if info.is_focused {
-            app.palette.accent
-        } else {
-            app.palette.overlay0
-        };
-        let mut style = Style::default().fg(color);
+        let mut style = app.pane_border_style(info.is_focused);
         if info.is_focused {
             style = style.add_modifier(Modifier::BOLD);
         }
@@ -826,8 +868,6 @@ pub(crate) fn render_selection_highlight<P: PartialEq>(
         }
     }
 }
-
-type Rgb = (u8, u8, u8);
 
 fn automatic_selection_style(
     p: &Palette,
@@ -890,17 +930,6 @@ fn selection_fg_for_bg(bg: Color, p: &Palette) -> Color {
         .unwrap_or_else(|| panel_contrast_fg(p))
 }
 
-fn mix_rgb(base: Rgb, target: Rgb, amount: f32) -> Rgb {
-    fn channel(base: u8, target: u8, amount: f32) -> u8 {
-        (f32::from(base) + (f32::from(target) - f32::from(base)) * amount).round() as u8
-    }
-    (
-        channel(base.0, target.0, amount),
-        channel(base.1, target.1, amount),
-        channel(base.2, target.2, amount),
-    )
-}
-
 fn relative_luminance(color: Rgb) -> f32 {
     fn channel(value: u8) -> f32 {
         let value = f32::from(value) / 255.0;
@@ -911,30 +940,6 @@ fn relative_luminance(color: Rgb) -> f32 {
         }
     }
     0.2126 * channel(color.0) + 0.7152 * channel(color.1) + 0.0722 * channel(color.2)
-}
-
-fn color_to_rgb(color: Color) -> Option<Rgb> {
-    match color {
-        Color::Reset => None,
-        Color::Black => Some((0, 0, 0)),
-        Color::Red => Some((128, 0, 0)),
-        Color::Green => Some((0, 128, 0)),
-        Color::Yellow => Some((128, 128, 0)),
-        Color::Blue => Some((0, 0, 128)),
-        Color::Magenta => Some((128, 0, 128)),
-        Color::Cyan => Some((0, 128, 128)),
-        Color::Gray => Some((192, 192, 192)),
-        Color::DarkGray => Some((128, 128, 128)),
-        Color::LightRed => Some((255, 0, 0)),
-        Color::LightGreen => Some((0, 255, 0)),
-        Color::LightYellow => Some((255, 255, 0)),
-        Color::LightBlue => Some((0, 0, 255)),
-        Color::LightMagenta => Some((255, 0, 255)),
-        Color::LightCyan => Some((0, 255, 255)),
-        Color::White => Some((255, 255, 255)),
-        Color::Rgb(r, g, b) => Some((r, g, b)),
-        Color::Indexed(_) => None,
-    }
 }
 
 #[cfg(test)]
@@ -1304,6 +1309,260 @@ mod tests {
         let buffer = terminal.backend().buffer();
         assert_eq!(buffer[(1, 1)].style().fg, Some(app.palette.accent));
         assert_eq!(buffer[(2, 1)].style().fg, Some(app.palette.overlay0));
+    }
+
+    fn two_pane_border_app() -> AppState {
+        let mut app = AppState::test_new();
+        app.pane_gaps = true;
+        app.view.terminal_area = Rect::new(0, 0, 4, 3);
+        app.view.pane_infos = vec![
+            PaneInfo {
+                id: PaneId::from_raw(1),
+                rect: Rect::new(0, 0, 2, 3),
+                inner_rect: Rect::default(),
+                scrollbar_rect: None,
+                borders: Borders::ALL,
+                is_focused: true,
+            },
+            PaneInfo {
+                id: PaneId::from_raw(2),
+                rect: Rect::new(2, 0, 2, 3),
+                inner_rect: Rect::default(),
+                scrollbar_rect: None,
+                borders: Borders::ALL,
+                is_focused: false,
+            },
+        ];
+        app
+    }
+
+    #[test]
+    fn unset_border_colors_keep_palette_render() {
+        let app = two_pane_border_app();
+        let ws = Workspace::test_new("test");
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(4, 3)).unwrap();
+
+        terminal
+            .draw(|frame| render_view_pane_borders(&app, &ws, &[], frame))
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(1, 1)].style().fg, Some(app.palette.accent));
+        assert_eq!(buffer[(2, 1)].style().fg, Some(app.palette.overlay0));
+        assert_eq!(
+            buffer[(1, 1)].style().bg,
+            Some(Color::Reset),
+            "unset background must leave the cell at the buffer default"
+        );
+        assert_eq!(buffer[(2, 1)].style().bg, Some(Color::Reset));
+    }
+
+    #[test]
+    fn configured_border_colors_reach_border_cells() {
+        let mut app = two_pane_border_app();
+        app.active_pane_border_fg = Some(Color::Rgb(245, 194, 231));
+        app.active_pane_border_bg = Some(Color::Rgb(49, 50, 68));
+        app.inactive_pane_border_fg = Some(Color::Rgb(69, 71, 90));
+        let ws = Workspace::test_new("test");
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(4, 3)).unwrap();
+
+        terminal
+            .draw(|frame| render_view_pane_borders(&app, &ws, &[], frame))
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(buffer[(1, 1)].style().fg, Some(Color::Rgb(245, 194, 231)));
+        assert_eq!(buffer[(1, 1)].style().bg, Some(Color::Rgb(49, 50, 68)));
+        assert_eq!(buffer[(2, 1)].style().fg, Some(Color::Rgb(69, 71, 90)));
+    }
+
+    #[test]
+    fn configured_active_border_bg_reaches_title_cells() {
+        let mut app = AppState::test_new();
+        app.view.terminal_area = Rect::new(0, 0, 12, 3);
+        app.active_pane_border_fg = Some(Color::Rgb(245, 194, 231));
+        app.active_pane_border_bg = Some(Color::Rgb(49, 50, 68));
+
+        let ws = Workspace::test_new("test");
+        let pane_id = ws.tabs[0].root_pane;
+        app.view.pane_infos = vec![PaneInfo {
+            id: pane_id,
+            rect: Rect::new(0, 0, 12, 3),
+            inner_rect: Rect::default(),
+            scrollbar_rect: None,
+            borders: Borders::ALL,
+            is_focused: true,
+        }];
+
+        let terminal_id = ws.tabs[0].panes[&pane_id].attached_terminal_id.clone();
+        let mut terminal_state = TerminalState::new(terminal_id.clone(), "/tmp".into());
+        terminal_state.set_manual_label("term".into());
+        app.terminals.insert(terminal_id, terminal_state);
+
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(12, 3)).unwrap();
+        terminal
+            .draw(|frame| render_view_pane_borders(&app, &ws, &[], frame))
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        // `pane_border_title` renders " term ", so the label starts at x = 2.
+        assert_eq!(buffer[(2, 0)].symbol(), "t");
+        let title_style = buffer[(2, 0)].style();
+        assert_eq!(title_style.fg, Some(Color::Rgb(245, 194, 231)));
+        assert_eq!(title_style.bg, Some(Color::Rgb(49, 50, 68)));
+        assert!(title_style.add_modifier.contains(Modifier::BOLD));
+
+        // The corner glyph carries the same background, so the top border
+        // reads as one continuous line rather than breaking at the label.
+        assert_eq!(buffer[(0, 0)].style().bg, Some(Color::Rgb(49, 50, 68)));
+    }
+
+    fn two_runtime_panes() -> (
+        AppState,
+        Vec<PaneInfo>,
+        super::super::tab_surface::TabSurfaceTarget,
+    ) {
+        let mut app = AppState::test_new();
+        let mut workspace = Workspace::test_new("test");
+        let root = workspace.tabs[0].root_pane;
+        let right = workspace.test_split(ratatui::layout::Direction::Horizontal);
+        workspace.tabs[0].layout.focus_pane(root);
+        workspace.insert_test_runtime(
+            root,
+            TerminalRuntime::test_with_scrollback_bytes(4, 3, 1024, b"aaaa"),
+        );
+        workspace.insert_test_runtime(
+            right,
+            TerminalRuntime::test_with_scrollback_bytes(4, 3, 1024, b"bbbb"),
+        );
+        app.workspaces = vec![workspace];
+        app.active = Some(0);
+
+        let pane_infos = vec![
+            PaneInfo {
+                id: root,
+                rect: Rect::new(0, 0, 4, 3),
+                inner_rect: Rect::new(0, 0, 4, 3),
+                scrollbar_rect: None,
+                borders: Borders::NONE,
+                is_focused: true,
+            },
+            PaneInfo {
+                id: right,
+                rect: Rect::new(4, 0, 4, 3),
+                inner_rect: Rect::new(4, 0, 4, 3),
+                scrollbar_rect: None,
+                borders: Borders::NONE,
+                is_focused: false,
+            },
+        ];
+        let target = super::super::tab_surface::TabSurfaceTarget {
+            workspace_index: 0,
+            tab_index: 0,
+        };
+        (app, pane_infos, target)
+    }
+
+    #[tokio::test]
+    async fn haze_blends_unfocused_pane_only() {
+        let (mut app, pane_infos, target) = two_runtime_panes();
+        app.inactive_pane_haze = 1.0;
+        app.inactive_pane_haze_color = Some(Color::Rgb(50, 60, 70));
+
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(8, 3)).unwrap();
+        terminal
+            .draw(|frame| {
+                render_panes(
+                    &app,
+                    &TerminalRuntimeRegistry::new(),
+                    frame,
+                    Some(target),
+                    &pane_infos,
+                    &[],
+                )
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        // Focused pane keeps exactly what the runtime painted.
+        assert_eq!(buffer[(0, 0)].style().bg, Some(Color::Reset));
+        // Unfocused pane goes fully to the haze colour at ratio 1.0.
+        assert_eq!(buffer[(4, 0)].style().bg, Some(Color::Rgb(50, 60, 70)));
+        // Foreground blends at HAZE_FG_FACTOR, so it moves without reaching the
+        // haze colour — otherwise text would vanish into the background.
+        let fg = buffer[(4, 0)].style().fg.expect("haze sets a foreground");
+        assert!(
+            matches!(fg, Color::Rgb(..)),
+            "fg should resolve to rgb, got {fg:?}"
+        );
+        assert_ne!(fg, Color::Rgb(50, 60, 70), "fg must blend less than bg");
+    }
+
+    #[tokio::test]
+    async fn haze_disabled_leaves_unfocused_cells_untouched() {
+        let (mut app, pane_infos, target) = two_runtime_panes();
+        app.inactive_pane_haze = 0.0;
+
+        let mut terminal =
+            ratatui::Terminal::new(ratatui::backend::TestBackend::new(8, 3)).unwrap();
+        terminal
+            .draw(|frame| {
+                render_panes(
+                    &app,
+                    &TerminalRuntimeRegistry::new(),
+                    frame,
+                    Some(target),
+                    &pane_infos,
+                    &[],
+                )
+            })
+            .unwrap();
+
+        let buffer = terminal.backend().buffer();
+        assert_eq!(
+            buffer[(4, 0)].style().bg,
+            Some(Color::Reset),
+            "no haze applied"
+        );
+        assert_eq!(buffer[(0, 0)].style().bg, Some(Color::Reset));
+    }
+
+    #[test]
+    fn haze_context_is_none_when_ratio_is_zero() {
+        let app = two_pane_border_app();
+        assert!(haze_context(&app).is_none());
+    }
+
+    #[test]
+    fn haze_context_defaults_color_to_host_background() {
+        let mut app = two_pane_border_app();
+        app.inactive_pane_haze = 0.5;
+        app.host_terminal_theme = crate::terminal_theme::TerminalTheme::default().with_color(
+            crate::terminal_theme::DefaultColorKind::Background,
+            crate::terminal_theme::RgbColor {
+                r: 30,
+                g: 30,
+                b: 46,
+            },
+        );
+
+        let ctx = haze_context(&app).expect("haze enabled");
+        assert_eq!(ctx.haze, (30, 30, 46));
+        assert_eq!(ctx.ratio, 0.5);
+    }
+
+    #[test]
+    fn haze_context_uses_configured_color_when_set() {
+        let mut app = two_pane_border_app();
+        app.inactive_pane_haze = 0.25;
+        app.inactive_pane_haze_color = Some(Color::Rgb(128, 128, 128));
+
+        let ctx = haze_context(&app).expect("haze enabled");
+        assert_eq!(ctx.haze, (128, 128, 128));
     }
 
     #[tokio::test]
