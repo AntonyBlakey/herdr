@@ -1,7 +1,7 @@
 use crate::config::{Keybinds, NewTerminalCwdConfig, SoundConfig, ToastConfig};
 use crossterm::event::{KeyCode, KeyModifiers};
 use ratatui::layout::Rect;
-use ratatui::style::Color;
+use ratatui::style::{Color, Style};
 
 use crate::detect::AgentState;
 use crate::layout::{PaneId, PaneInfo};
@@ -842,6 +842,17 @@ pub struct AppState {
     pub pane_scrollbars: bool,
     pub pane_gaps: bool,
     pub show_agent_labels_on_pane_borders: bool,
+    /// Resolved border colors. `None` means "fall back to the palette" for a
+    /// foreground, and "leave the cell background untouched" for a background.
+    pub active_pane_border_fg: Option<Color>,
+    pub active_pane_border_bg: Option<Color>,
+    pub inactive_pane_border_fg: Option<Color>,
+    pub inactive_pane_border_bg: Option<Color>,
+    /// Blend ratio for unfocused panes; 0.0 disables hazing.
+    pub inactive_pane_haze: f32,
+    /// Colour unfocused panes blend toward. `None` derives it from the host
+    /// terminal background, falling back to the theme panel background.
+    pub inactive_pane_haze_color: Option<Color>,
     pub tab_bar_right: Vec<TabBarStatusSegment>,
     pub tab_bar_right_separator: String,
     /// Expose the focused pane's cursor anchor to the outer terminal even when
@@ -898,6 +909,30 @@ pub struct AppState {
 }
 
 impl AppState {
+    /// Style for one pane border cell. Configured colors win; otherwise the
+    /// palette supplies the foreground and the background is left untouched.
+    pub fn pane_border_style(&self, focused: bool) -> Style {
+        let (fg, bg, fallback_fg) = if focused {
+            (
+                self.active_pane_border_fg,
+                self.active_pane_border_bg,
+                self.palette.accent,
+            )
+        } else {
+            (
+                self.inactive_pane_border_fg,
+                self.inactive_pane_border_bg,
+                self.palette.overlay0,
+            )
+        };
+
+        let mut style = Style::default().fg(fg.unwrap_or(fallback_fg));
+        if let Some(bg) = bg {
+            style = style.bg(bg);
+        }
+        style
+    }
+
     pub(crate) fn mark_session_dirty(&mut self) {
         self.session_dirty = true;
     }
@@ -1085,6 +1120,12 @@ impl AppState {
             pane_scrollbars: true,
             pane_gaps: false,
             show_agent_labels_on_pane_borders: false,
+            active_pane_border_fg: None,
+            active_pane_border_bg: None,
+            inactive_pane_border_fg: None,
+            inactive_pane_border_bg: None,
+            inactive_pane_haze: 0.0,
+            inactive_pane_haze_color: None,
             tab_bar_right: Vec::new(),
             tab_bar_right_separator: " ".into(),
             reveal_hidden_cursor_for_cjk_ime: false,
@@ -1342,6 +1383,40 @@ mod tests {
         assert_eq!(
             state.new_pane_size(crate::ui::NewPanePlacement::Alone),
             (41, 132)
+        );
+    }
+
+    #[test]
+    fn pane_border_style_falls_back_to_palette() {
+        let app = AppState::test_new();
+
+        let focused = app.pane_border_style(true);
+        assert_eq!(focused.fg, Some(app.palette.accent));
+        assert_eq!(focused.bg, None, "unset background must not be stamped");
+
+        let unfocused = app.pane_border_style(false);
+        assert_eq!(unfocused.fg, Some(app.palette.overlay0));
+        assert_eq!(unfocused.bg, None, "unset background must not be stamped");
+    }
+
+    #[test]
+    fn pane_border_style_uses_configured_colors() {
+        let mut app = AppState::test_new();
+        app.active_pane_border_fg = Some(Color::Rgb(245, 194, 231));
+        app.active_pane_border_bg = Some(Color::Rgb(49, 50, 68));
+        app.inactive_pane_border_fg = Some(Color::Rgb(69, 71, 90));
+        app.inactive_pane_border_bg = Some(Color::Reset);
+
+        let focused = app.pane_border_style(true);
+        assert_eq!(focused.fg, Some(Color::Rgb(245, 194, 231)));
+        assert_eq!(focused.bg, Some(Color::Rgb(49, 50, 68)));
+
+        let unfocused = app.pane_border_style(false);
+        assert_eq!(unfocused.fg, Some(Color::Rgb(69, 71, 90)));
+        assert_eq!(
+            unfocused.bg,
+            Some(Color::Reset),
+            "an explicit reset must be distinct from unset"
         );
     }
 

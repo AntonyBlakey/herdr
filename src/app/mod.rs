@@ -541,6 +541,32 @@ impl App {
             pane_scrollbars: config.ui.pane_scrollbars,
             pane_gaps: config.ui.pane_gaps,
             show_agent_labels_on_pane_borders: config.ui.show_agent_labels_on_pane_borders,
+            active_pane_border_fg: config
+                .ui
+                .active_pane_border_fg
+                .as_deref()
+                .map(crate::config::parse_color),
+            active_pane_border_bg: config
+                .ui
+                .active_pane_border_bg
+                .as_deref()
+                .map(crate::config::parse_color),
+            inactive_pane_border_fg: config
+                .ui
+                .inactive_pane_border_fg
+                .as_deref()
+                .map(crate::config::parse_color),
+            inactive_pane_border_bg: config
+                .ui
+                .inactive_pane_border_bg
+                .as_deref()
+                .map(crate::config::parse_color),
+            inactive_pane_haze: config.ui.inactive_pane_haze(),
+            inactive_pane_haze_color: config
+                .ui
+                .inactive_pane_haze_color
+                .as_deref()
+                .map(crate::config::parse_color),
             tab_bar_right: Vec::new(),
             tab_bar_right_separator: String::new(),
             reveal_hidden_cursor_for_cjk_ime: config.experimental.reveal_hidden_cursor_for_cjk_ime,
@@ -907,6 +933,32 @@ impl App {
                 self.state.pane_gaps = config.ui.pane_gaps;
                 self.state.show_agent_labels_on_pane_borders =
                     config.ui.show_agent_labels_on_pane_borders;
+                self.state.active_pane_border_fg = config
+                    .ui
+                    .active_pane_border_fg
+                    .as_deref()
+                    .map(crate::config::parse_color);
+                self.state.active_pane_border_bg = config
+                    .ui
+                    .active_pane_border_bg
+                    .as_deref()
+                    .map(crate::config::parse_color);
+                self.state.inactive_pane_border_fg = config
+                    .ui
+                    .inactive_pane_border_fg
+                    .as_deref()
+                    .map(crate::config::parse_color);
+                self.state.inactive_pane_border_bg = config
+                    .ui
+                    .inactive_pane_border_bg
+                    .as_deref()
+                    .map(crate::config::parse_color);
+                self.state.inactive_pane_haze = config.ui.inactive_pane_haze();
+                self.state.inactive_pane_haze_color = config
+                    .ui
+                    .inactive_pane_haze_color
+                    .as_deref()
+                    .map(crate::config::parse_color);
                 self.configure_tab_bar_status(
                     &config.ui.tab_bar_right,
                     &config.ui.tab_bar_right_separator,

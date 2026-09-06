@@ -1000,6 +1000,42 @@
           "description": "Show agent labels in split pane borders when no manual pane label is set."
         },
         {
+          "key": "ui.active_pane_border_fg",
+          "type": "color",
+          "default": "unset",
+          "description": "Foreground color for the focused pane's border. Unset uses the theme accent. Accepts hex (#f5c2e7), named colors, or RGB (rgb(245,194,231))."
+        },
+        {
+          "key": "ui.active_pane_border_bg",
+          "type": "color",
+          "default": "unset",
+          "description": "Background color for the focused pane's border. Unset leaves the cell background untouched."
+        },
+        {
+          "key": "ui.inactive_pane_border_fg",
+          "type": "color",
+          "default": "unset",
+          "description": "Foreground color for unfocused pane borders. Unset uses the theme's muted overlay color."
+        },
+        {
+          "key": "ui.inactive_pane_border_bg",
+          "type": "color",
+          "default": "unset",
+          "description": "Background color for unfocused pane borders. Unset leaves the cell background untouched."
+        },
+        {
+          "key": "ui.inactive_pane_haze",
+          "type": "number",
+          "default": "0.0",
+          "description": "Blend ratio for unfocused pane cells. 0.0 disables hazing, 1.0 is fully the haze color. Values outside 0.0-1.0 are clamped."
+        },
+        {
+          "key": "ui.inactive_pane_haze_color",
+          "type": "color",
+          "default": "unset",
+          "description": "Color unfocused panes blend toward. Unset uses the host terminal's default background, falling back to the theme panel background."
+        },
+        {
           "key": "ui.hide_tab_bar_when_single_tab",
           "type": "boolean",
           "default": "false",

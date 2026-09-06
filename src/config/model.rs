@@ -980,6 +980,21 @@ pub struct UiConfig {
     pub pane_gaps: bool,
     /// Show agent labels in split pane borders when no manual pane label is set. Default: false.
     pub show_agent_labels_on_pane_borders: bool,
+    /// Foreground color for the focused pane's border. Unset uses the theme accent.
+    /// Accepts hex (#f5c2e7), named colors, rgb(r,g,b), or reset aliases.
+    pub active_pane_border_fg: Option<String>,
+    /// Background color for the focused pane's border. Unset leaves the cell background untouched.
+    pub active_pane_border_bg: Option<String>,
+    /// Foreground color for unfocused pane borders. Unset uses the theme's muted overlay color.
+    pub inactive_pane_border_fg: Option<String>,
+    /// Background color for unfocused pane borders. Unset leaves the cell background untouched.
+    pub inactive_pane_border_bg: Option<String>,
+    /// Blend ratio for unfocused pane cells. 0.0 disables hazing, 1.0 is fully the
+    /// haze color. Values outside 0.0..=1.0 are clamped. Default: 0.0.
+    pub inactive_pane_haze: f32,
+    /// Color unfocused panes blend toward. Unset uses the host terminal's default
+    /// background, falling back to the theme panel background.
+    pub inactive_pane_haze_color: Option<String>,
     /// Hide the tab row when the workspace has one tab. Default: false.
     pub hide_tab_bar_when_single_tab: bool,
     /// Desktop tab row placement. Default: top.
@@ -1218,6 +1233,12 @@ impl Default for UiConfig {
             pane_scrollbars: true,
             pane_gaps: true,
             show_agent_labels_on_pane_borders: false,
+            active_pane_border_fg: None,
+            active_pane_border_bg: None,
+            inactive_pane_border_fg: None,
+            inactive_pane_border_bg: None,
+            inactive_pane_haze: 0.0,
+            inactive_pane_haze_color: None,
             hide_tab_bar_when_single_tab: false,
             tab_bar_position: TabBarPositionConfig::Top,
             tab_bar_right: Vec::new(),
@@ -1239,6 +1260,16 @@ impl UiConfig {
         self.mouse_scroll_lines
             .map(NonZeroUsize::get)
             .unwrap_or(DEFAULT_MOUSE_SCROLL_LINES)
+    }
+
+    /// Haze ratio clamped to a usable range. NaN disables hazing rather than
+    /// propagating into color math: `f32::clamp` panics only on NaN bounds, but
+    /// NaN input would return NaN, so it needs an explicit guard.
+    pub fn inactive_pane_haze(&self) -> f32 {
+        if self.inactive_pane_haze.is_nan() {
+            return 0.0;
+        }
+        self.inactive_pane_haze.clamp(0.0, 1.0)
     }
 
     pub fn right_click_passthrough_modifiers(&self) -> Option<KeyModifiers> {
@@ -1565,6 +1596,66 @@ tab_bar_right_separator = " · "
             TabBarRightEntryConfig::Hostname
         ));
         assert_eq!(config.ui.tab_bar_right_separator, " · ");
+    }
+
+    #[test]
+    fn pane_border_colors_default_and_parse() {
+        let default_config = Config::default();
+        assert!(default_config.ui.active_pane_border_fg.is_none());
+        assert!(default_config.ui.active_pane_border_bg.is_none());
+        assert!(default_config.ui.inactive_pane_border_fg.is_none());
+        assert!(default_config.ui.inactive_pane_border_bg.is_none());
+
+        let toml = r##"
+[ui]
+active_pane_border_fg = "#f5c2e7"
+active_pane_border_bg = "#313244"
+inactive_pane_border_fg = "#45475a"
+inactive_pane_border_bg = "reset"
+"##;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert_eq!(config.ui.active_pane_border_fg.as_deref(), Some("#f5c2e7"));
+        assert_eq!(config.ui.active_pane_border_bg.as_deref(), Some("#313244"));
+        assert_eq!(
+            config.ui.inactive_pane_border_fg.as_deref(),
+            Some("#45475a")
+        );
+        assert_eq!(config.ui.inactive_pane_border_bg.as_deref(), Some("reset"));
+    }
+
+    #[test]
+    fn inactive_pane_haze_defaults_and_parses() {
+        let default_config = Config::default();
+        assert_eq!(default_config.ui.inactive_pane_haze, 0.0);
+        assert!(default_config.ui.inactive_pane_haze_color.is_none());
+
+        let toml = r##"
+[ui]
+inactive_pane_haze = 0.35
+inactive_pane_haze_color = "#808080"
+"##;
+        let config: Config = toml::from_str(toml).unwrap();
+        assert_eq!(config.ui.inactive_pane_haze, 0.35);
+        assert_eq!(
+            config.ui.inactive_pane_haze_color.as_deref(),
+            Some("#808080")
+        );
+    }
+
+    #[test]
+    fn inactive_pane_haze_clamps_out_of_range() {
+        let high: Config = toml::from_str("[ui]\ninactive_pane_haze = 4.0\n").unwrap();
+        assert_eq!(high.ui.inactive_pane_haze(), 1.0);
+
+        let low: Config = toml::from_str("[ui]\ninactive_pane_haze = -2.0\n").unwrap();
+        assert_eq!(low.ui.inactive_pane_haze(), 0.0);
+
+        let nan: Config = toml::from_str("[ui]\ninactive_pane_haze = nan\n").unwrap();
+        assert_eq!(
+            nan.ui.inactive_pane_haze(),
+            0.0,
+            "NaN must disable, not panic"
+        );
     }
 
     #[test]

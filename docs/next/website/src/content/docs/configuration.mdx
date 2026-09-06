@@ -313,6 +313,27 @@ The sidebar is the main Herdr dashboard. Search `ui.` in the [Config reference](
 
 `ui.pane_borders` accepts `"auto"` (the default, borders only for split panes), `"always"` (also frame a single pane), or `"off"`. A single-pane frame requires `ui.pane_outer_borders = true`, because all its edges are outer edges. Existing boolean values remain valid: `true` means `"auto"` and `false` means `"off"`.
 
+Split pane borders follow the theme by default. Override them per state when you want the focused pane to stand out without restyling the rest of the UI:
+
+```toml
+[ui]
+active_pane_border_fg = "#f5c2e7"
+active_pane_border_bg = "#313244"
+inactive_pane_border_fg = "#45475a"
+```
+
+Each key is optional. An unset foreground follows the theme, and an unset background leaves the border transparent. Values accept the same formats as theme colors: hex, named colors, `rgb(r,g,b)`, and reset aliases. By default borders are only drawn in split layouts, so these have no effect on a single-pane workspace unless `ui.pane_borders = "always"` frames it.
+
+Unfocused split panes can also be hazed, blending them toward a color so the focused pane stands out while you work:
+
+```toml
+[ui]
+inactive_pane_haze = 0.35
+inactive_pane_haze_color = "#808080"
+```
+
+`inactive_pane_haze` is a ratio from `0.0` (off, the default) to `1.0` (fully the haze color); values outside that range are clamped. `inactive_pane_haze_color` defaults to your terminal's own background, so unfocused panes fade into the backdrop; set it for a different tint. Text blends less than the background so it stays readable. Terminal images are drawn by your terminal rather than by Herdr and are not hazed.
+
 Set `tab_bar_position = "bottom"` under `[ui]` to place the desktop tab row below the terminal panes. Prefix, Navigate, Copy, and Resize mode bars temporarily replace the bottom tab row while active. The default is `"top"`.
 
 Configure an ordered tmux-style status area at the right edge of the tab row:
