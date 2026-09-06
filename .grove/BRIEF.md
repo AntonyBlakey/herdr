@@ -114,6 +114,35 @@ landed `feat: make outer pane borders configurable (#2535)` and now has
 border fg/bg keys and no haze, so cluster C is an addition in a shared namespace,
 not a duplicate.
 
+## Baseline (established by `upstream-base-k2`)
+
+- **Base commit is `e366a05f docs: publish preview documentation`**, not the
+  `9e9bc8a1` this brief was drafted against — upstream moved. `linkuistics-fork-next`
+  is off that.
+- **Validate with this environment, or the result is meaningless:**
+
+  ```bash
+  export PATH="$HOME/.cargo/bin:$PATH"          # honour rust-toolchain.toml (1.96.1);
+                                                #   ambient PATH here has Homebrew cargo 1.98.0
+  export ZIG=/opt/homebrew/opt/zig@0.15/bin/zig # ambient zig is 0.16.0; vendor needs 0.15.2
+  env -u HERDR_SOCKET_PATH -u HERDR_CLIENT_SOCKET_PATH just check
+  ```
+
+- **`just check` is RED at baseline with exactly four failures**, all pre-existing
+  on pristine upstream with no fork patches applied:
+  `live_handoff_preserves_pane_process_io`,
+  `live_handoff_keeps_agent_started_pane_after_agent_exits`,
+  `live_handoff_keeps_unmanaged_agent_name_bound_to_saved_session`,
+  `pane_info_and_subscriptions_expose_done_agent_status`.
+  Everything else is green: fmt, clippy, Windows-target clippy, and all five
+  script/doc gates. Full suite is `3077 passed, 4 failed, 2 skipped` of 3081.
+- So **`just check` exiting non-zero is not by itself a port regression.** The
+  `Done when` bar in this brief means *these four and no others*. Because
+  `just check` is fail-fast, confirm a clean result with
+  `cargo nextest run --locked --no-fail-fast` and diff the failure list against
+  those four. Full evidence and the two rejected explanations are in
+  `02-DONE-impl--upstream-base-k2.md`.
+
 ## On the horizon
 
 - Extending `ui.layout` to cover upstream's newer UI surfaces — plugin panes, the
