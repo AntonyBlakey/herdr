@@ -12,6 +12,7 @@ pub mod response;
 pub mod server;
 pub mod session;
 pub mod tabs;
+pub mod ui;
 pub mod workspaces;
 pub mod worktrees;
 
@@ -26,6 +27,7 @@ pub use response::*;
 pub use server::*;
 pub use session::*;
 pub use tabs::*;
+pub use ui::*;
 pub use workspaces::*;
 pub use worktrees::*;
 
@@ -95,6 +97,7 @@ operations::define_operations! {
     PaneMove(PaneMoveParams) => "pane.move", true, false;
     PaneZoom(PaneZoomParams) => "pane.zoom", true, true;
     PaneLayout(PaneLayoutParams) => "pane.layout", false, false;
+    UiLayout(EmptyParams) => "ui.layout", false, false;
     PaneProcessInfo(PaneProcessInfoParams) => "pane.process_info", false, false;
     LayoutExport(LayoutExportParams) => "layout.export", false, false;
     LayoutApply(LayoutApplyParams) => "layout.apply", true, false;

@@ -114,6 +114,38 @@ pub(super) fn sync_client_shell_keyboard_report_all(
     Ok(())
 }
 
+/// Publish this shell's chrome geometry to the active endpoint when it changed.
+///
+/// The endpoint answers `ui.layout` from the last report, so this runs once per
+/// loop iteration rather than on any single input path: layout moves on snapshot
+/// arrival and overlay changes as well as on resize. Unchanged geometry sends
+/// nothing, which is the common case.
+pub(super) fn publish_client_shell_ui_layout(
+    state: &mut ClientState,
+    endpoints: &mut endpoint::EndpointRegistry,
+) {
+    let Some(shell) = state.shell.as_ref() else {
+        return;
+    };
+    let report = shell.ui_layout_report(state.reported_size.0, state.reported_size.1);
+    if state.published_ui_layout.as_ref() == Some(&report) {
+        return;
+    }
+    let Ok(data) = serde_json::to_string(&report) else {
+        return;
+    };
+    // An unreachable endpoint is not this report's problem: keep the last
+    // published value unset so the next iteration retries.
+    if endpoints.send(&ClientMessage::EndpointControl {
+        kind: crate::protocol::endpoint::UI_LAYOUT_REPORT_KIND.into(),
+        data,
+    }) != endpoint::EndpointSendOutcome::Sent
+    {
+        return;
+    }
+    state.published_ui_layout = Some(report);
+}
+
 pub(super) fn clear_endpoint_host_effects(
     state: &mut ClientState,
     host_mouse_capture_active: &std::sync::atomic::AtomicBool,

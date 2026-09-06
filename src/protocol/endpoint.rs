@@ -39,6 +39,15 @@ pub struct EndpointAgentCompletions {
     pub completions: std::collections::BTreeMap<String, u64>,
 }
 
+/// Optional named control carrying a client-owned shell's chrome geometry.
+///
+/// Sidebar and tab-bar geometry is client state, so an endpoint can only answer
+/// the `ui.layout` API method from what a shell reports about itself. This rides
+/// the extensible `EndpointControl` envelope rather than a new `ClientMessage`
+/// variant, because generation-1 codec enums are append-closed. Endpoints that
+/// do not know the kind ignore it.
+pub const UI_LAYOUT_REPORT_KIND: &str = "herdr.ui.layout.report.v1";
+
 fn default_true() -> bool {
     true
 }
@@ -104,6 +113,49 @@ pub struct EndpointServerWelcome {
     pub capabilities: Vec<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<EndpointHandshakeError>,
+}
+
+/// One client-owned shell's chrome geometry, as published to its endpoint.
+///
+/// Field-for-field the `ui.layout` response payload, so the endpoint stores and
+/// replays it without reinterpreting client presentation state.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct UiLayoutReport {
+    pub layout: crate::api::schema::UiLayoutPath,
+    pub obscured: bool,
+    pub canvas: crate::api::schema::UiLayoutCanvas,
+    pub sidebar: crate::api::schema::UiLayoutSidebar,
+    pub tab_bar: crate::api::schema::UiLayoutTabBar,
+}
+
+impl Default for UiLayoutReport {
+    fn default() -> Self {
+        let empty_rect = crate::api::schema::PaneLayoutRect {
+            x: 0,
+            y: 0,
+            width: 0,
+            height: 0,
+        };
+        Self {
+            layout: crate::api::schema::UiLayoutPath::Desktop,
+            obscured: false,
+            canvas: crate::api::schema::UiLayoutCanvas {
+                width: 0,
+                height: 0,
+            },
+            sidebar: crate::api::schema::UiLayoutSidebar {
+                mode: crate::api::schema::SidebarMode::Hidden,
+                rect: empty_rect,
+                workspaces: Vec::new(),
+                agents: Vec::new(),
+            },
+            tab_bar: crate::api::schema::UiLayoutTabBar {
+                rect: empty_rect,
+                workspace_id: String::new(),
+                tabs: Vec::new(),
+            },
+        }
+    }
 }
 
 pub fn snapshot_message(snapshot: &ClientShellSnapshot) -> serde_json::Result<ServerMessage> {
