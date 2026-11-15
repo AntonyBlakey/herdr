@@ -39,20 +39,34 @@ For example, upstream now declares API methods in the `define_operations!` table
 
 ## Validate
 
-Run `just check` on the tip. This machine needs two overrides:
+Run the checks through mise. The project `mise.toml` pins Zig 0.16.0, which
+the vendored libghostty-vt build requires:
 
-- Set `ZIG` to a Zig 0.16.0 binary. Homebrew's `zig` is newer, and the vendored libghostty-vt build refuses it.
-- Put `$HOME/.cargo/bin` first on `PATH`. Homebrew's `cargo` otherwise comes first and ignores `rust-toolchain.toml`. Its newer clippy then fails on upstream code.
+```sh
+mise install zig
+mise exec -- env -u ZIG PATH="$HOME/.cargo/bin:$PATH" just check
+```
+
+Keep `$HOME/.cargo/bin` first on `PATH` so rustup honours
+`rust-toolchain.toml`. Homebrew's newer `cargo` otherwise comes first and
+its clippy fails on upstream code. An existing `ZIG` environment override
+takes precedence over mise's `PATH`; clear it when using the project pin.
 
 `api_ping::pane_info_and_subscriptions_expose_done_agent_status` times out on this machine.
 It also fails on pure upstream master (2026-10-21), so it is not a fork regression.
 Before you accept any other failure, compare it with upstream in a separate jj workspace.
 
+Windows lint also needs a Windows SDK configured at
+`~/.local/share/herdr/windows-cross/libc.txt`. On 2026-11-16 this configuration
+was absent; `just windows-lint` failed identically on the fork and pure upstream
+`ee5bfb50`. The native checks and documentation contract tests passed with the
+known API timeout excluded. SDK setup is a separate machine task.
+
 ## Release and install
 
 A release is a bump of the Homebrew formula. There is no GitHub release.
 
-1. Edit `Formula/linkuistics-herdr.rb` in the project checkout `~/Development/homebrew-taps`. Do not edit the Homebrew tap clone under `/opt/homebrew/Library/Taps/`.
+1. Edit `Formula/linkuistics-herdr.rb` in the project checkout `~/Development/Delivery/homebrew-taps`. Do not edit the Homebrew tap clone under `/opt/homebrew/Library/Taps/`.
 2. Set `revision` to the pushed `linkuistics-fork` commit.
 3. Set `version` to `<upstream Cargo version>-linkuistics.<seq>`. Increase `<seq>` on every release. When the upstream version changes, set `<seq>` to 1.
 4. Describe the change as `linkuistics-herdr v<version>`, move bookmark `main` to it and push `main`.
@@ -60,4 +74,23 @@ A release is a bump of the Homebrew formula. There is no GitHub release.
 6. Run `brew upgrade linkuistics/taps/linkuistics-herdr`.
 7. Run `herdr --version` and make sure that it prints the new version.
 
-A running herdr server keeps the old binary until it restarts.
+The formula downloads the eight required native Zig packages as
+checksum-verified Homebrew resources and imports them with `zig fetch` before
+building. Zig 0.16.0's own HTTP client fails for these downloads on this
+machine; curl succeeds. When updating vendored libghostty-vt, align the resource
+URLs with its root and `pkg/*/build.zig.zon` manifests, including translate-c's
+transitive `aro` dependency, and update their SHA-256 checksums. Zig also
+verifies each package against the manifest's content hash during the build.
+
+A running herdr server keeps the old binary until it restarts. After the
+upgrade, request a live transfer to the installed binary with:
+
+```sh
+herdr server live-handoff --import-exe /opt/homebrew/bin/herdr
+herdr status server
+```
+
+For a named session, add `--session NAME` before `server`. The handoff
+command is hidden from normal help; use `herdr server live-handoff --help`
+to inspect its options. Live handoff preserves pane processes but interrupts
+transient API requests and subscriptions.
