@@ -94,3 +94,15 @@ For a named session, add `--session NAME` before `server`. The handoff
 command is hidden from normal help; use `herdr server live-handoff --help`
 to inspect its options. Live handoff preserves pane processes but interrupts
 transient API requests and subscriptions.
+
+## Open reports
+
+The human reported on 2026-11-16 that a workspace switch removes the two most
+recent lines from a pane after an agent exits. On `0.9.5-linkuistics.2`, three
+round trips preserved the history. The first followed plain shell output. The
+second followed a Codex 0.169.0 start and exit without a prompt. The third
+followed two new output lines.
+
+A run after real agent work remains untested. The evidence is in
+`/var/tmp/herdr-history-20261116-0123`. Reproduce it in a disposable named
+session before changing code.
